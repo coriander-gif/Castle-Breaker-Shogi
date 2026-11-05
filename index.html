@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>穴熊突破将棋 - 最強の守りを崩せ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap');
+        
+        body {
+            font-family: 'Yuji Syuku', serif;
+            background-color: #8c6a4f;
+            background-image: 
+                radial-gradient(circle at center, transparent 30%, rgba(20, 10, 0, 0.6) 100%),
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+            background-attachment: fixed;
+            touch-action: manipulation;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        #board {
+            background-color: #d6aa69;
+            border: 4px solid #5d4037;
+            box-shadow: 2px 4px 10px rgba(0,0,0,0.3);
+            margin: 0 auto;
+        }
+
+        .cell {
+            width: 40px;
+            height: 46px;
+            border: 1px solid #7a583e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 22px;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        @media (min-width: 600px) {
+            .cell {
+                width: 50px;
+                height: 56px;
+                font-size: 28px;
+            }
+        }
+
+        .piece {
+            width: 90%;
+            height: 95%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg"><polygon points="50,5 75,30 90,105 10,105 25,30" fill="%23fdf4d6" stroke="%23333" stroke-width="4" stroke-linejoin="round"/></svg>');
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-position: center;
+            padding-top: 10%;
+            color: #111;
+            filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
+        }
+
+        .opponent-piece {
+            transform: rotate(180deg);
+        }
+
+        .promoted {
+            color: #d13030;
+        }
+
+        .selected {
+            background-color: rgba(255, 255, 0, 0.4);
+        }
+
+        .highlight {
+            background-color: rgba(0, 255, 0, 0.2);
+        }
+        
+        .highlight::after {
+            content: '';
+            display: block;
+            width: 12px;
+            height: 12px;
+            background-color: rgba(0, 128, 0, 0.6);
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        .last-move {
+            background-color: rgba(255, 165, 0, 0.4);
+        }
+
+        .hand-area {
+            display: flex;
+            flex-wrap: wrap;
+            min-height: 50px;
+            padding: 4px;
+            background-color: transparent;
+            width: 100%;
+            gap: 4px;
+        }
+
+        .hand-piece {
+            width: 42px;
+            height: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 22px;
+            cursor: pointer;
+            user-select: none;
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg"><polygon points="50,5 75,30 90,105 10,105 25,30" fill="%23fdf4d6" stroke="%23333" stroke-width="4" stroke-linejoin="round"/></svg>');
+            background-size: 100% 100%;
+            padding-top: 10%;
+            font-weight: bold;
+            position: relative;
+            filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
+            transition: transform 0.1s;
+        }
+        .hand-piece:hover {
+            transform: translateY(-2px);
+        }
+        .hand-piece.selected {
+            filter: drop-shadow(0px 0px 4px yellow) brightness(1.1);
+        }
+        .hand-count {
+            font-size: 14px;
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: #333;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .player-label {
+            background-color: #6e462e;
+            color: #ebd1ba;
+            padding: 8px 16px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 2px;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.1), 1px 1px 3px rgba(0,0,0,0.4);
+            letter-spacing: 2px;
+        }
+
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
+        }
+        #modal-content {
+            background: #fdf4d6;
+            padding: 24px;
+            border-radius: 8px;
+            border: 3px solid #5d4037;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            min-width: 320px;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col lg:flex-row justify-center items-center lg:items-start py-10 w-full px-2 gap-8 mx-auto max-w-5xl">
+
+    <!-- サイドパネル（説明と操作） -->
+    <div class="flex flex-col gap-4 w-full max-w-xs bg-[#e3ded6] p-6 rounded-lg shadow-lg border-2 border-[#5d4037] shrink-0 mt-8 lg:mt-0">
+        <h1 class="text-2xl font-bold text-center text-[#4a3623] mb-2 border-b-2 border-[#5d4037] pb-2">穴熊突破将棋</h1>
+        <p class="text-sm font-bold text-gray-700 leading-relaxed text-center">
+            相手は将棋界最強の囲い<br>「穴熊」を完成させている。<br><br>
+            豊富な持ち駒と攻め駒を駆使し、<br>強固な守りを突破して玉を討ち取れ！
+        </p>
+
+        <div id="message" class="text-lg font-bold text-center mt-4 text-white bg-black/70 px-4 py-3 rounded shadow-inner">
+            先手（あなた）の番です
+        </div>
+        
+        <!-- 手数制限の表示 -->
+        <div id="move-limit-display" class="text-xl font-bold text-center mt-3 text-red-800 bg-red-100 border-2 border-red-800 rounded py-2 shadow hidden">
+            残り手数: <span id="remaining-moves-text">--</span>手
+        </div>
+        
+        <button id="reset-btn" class="mt-6 px-6 py-3 bg-[#5d4037] text-[#fdf4d6] border-2 border-[#4a3623] rounded shadow-lg hover:bg-[#4a3623] transition font-bold text-lg">囲いを選択 / やり直す</button>
+    </div>
+
+    <!-- ゲームエリア -->
+    <div class="flex flex-col items-center w-full max-w-md shrink-0">
+        <!-- 後手（CPU）エリア -->
+        <div class="w-full flex justify-between items-start mb-2">
+            <!-- 後手の駒台 -->
+            <div class="flex items-start gap-1">
+                <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[180px] min-h-[70px]">
+                    <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-t border-[#5d4037]/50 pt-1 block rotate-180">後手の駒台</div>
+                    <div id="opponent-hand" class="hand-area flex flex-wrap gap-1 flex-row-reverse"></div>
+                </div>
+            </div>
+            <!-- ラベル -->
+            <div class="flex flex-col items-end flex-1 pl-2">
+                <div id="opponent-label" class="player-label mb-2 rotate-180">鉄壁の穴熊 (CPU)</div>
+            </div>
+        </div>
+
+        <!-- 盤面 -->
+        <div id="board" class="grid grid-cols-9 grid-rows-9"></div>
+
+        <!-- 先手（プレイヤー）エリア -->
+        <div class="w-full flex justify-between items-end mt-4">
+            <!-- ラベル -->
+            <div class="flex flex-col items-start flex-1 pr-2">
+                <div class="player-label mb-2">挑戦者 (あなた)</div>
+            </div>
+            <!-- 先手の駒台 -->
+            <div class="flex items-end gap-1">
+                <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[220px] min-h-[70px]">
+                    <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">先手の駒台</div>
+                    <div id="player-hand" class="hand-area flex flex-wrap gap-1"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メッセージモーダル -->
+    <div id="modal-overlay">
+        <div id="modal-content" class="flex flex-col items-center">
+            <h3 id="modal-title" class="text-xl font-bold mb-3 text-[#4a3623]"></h3>
+            <p id="modal-message" class="text-md mb-5 font-bold text-gray-800"></p>
+            <div id="modal-buttons" class="flex gap-4 mt-2 w-full justify-center flex-wrap">
+            </div>
+        </div>
+    </div>
+
+<script>
+// --- 定数定義 ---
+const PLAYER = 0; // 先手 (プレイヤー)
+const OPPONENT = 1; // 後手 (CPU)
+
+// 駒の種類
+const EMPTY = 0;
+const PAWN = 1;
+const LANCE = 2;
+const KNIGHT = 3;
+const SILVER = 4;
+const GOLD = 5;
+const BISHOP = 6;
+const ROOK = 7;
+const KING = 8;
+
+// 駒の移動方向
+const MOVE_DIRS = {
+    KING: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}],
+    PAWN: { 0: [{dx: 0, dy: -1}], 1: [{dx: 0, dy: 1}] },
+    KNIGHT: { 0: [{dx: -1, dy: -2}, {dx: 1, dy: -2}], 1: [{dx: -1, dy: 2}, {dx: 1, dy: 2}] },
+    SILVER: { 
+        0: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:1}, {dx:1,dy:1}],
+        1: [{dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}, {dx:-1,dy:-1}, {dx:1,dy:-1}]
+    },
+    GOLD: {
+        0: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:1}],
+        1: [{dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:-1}]
+    },
+    LANCE: { 0: [{dx: 0, dy: -1, slide: true}], 1: [{dx: 0, dy: 1, slide: true}] },
+    BISHOP: [{dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}],
+    ROOK: [{dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true}],
+    PRO_BISHOP: [
+        {dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true},
+        {dx:0, dy:-1}, {dx:0, dy:1}, {dx:-1, dy:0}, {dx:1, dy:0}
+    ],
+    PRO_ROOK: [
+        {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
+        {dx:-1, dy:-1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:1, dy:1}
+    ]
+};
+
+const pieceStrs = {
+    [PAWN]: ['歩', 'と'], [LANCE]: ['香', '杏'], [KNIGHT]: ['桂', '圭'],
+    [SILVER]: ['銀', '全'], [GOLD]: ['金', ''], [BISHOP]: ['角', '馬'],
+    [ROOK]: ['飛', '龍'], [KING]: ['玉', '']
+};
+
+// --- ゲームロジック ---
+class Game {
+    constructor() {
+        this.currentLevel = 'anaguma_normal'; // デフォルトは穴熊(中級)からスタート
+        this.initBoardDOM();
+        this.initBoard(this.currentLevel);
+    }
+
+    initBoardDOM() {
+        const boardEl = document.getElementById('board');
+        boardEl.innerHTML = '';
+        this.cells = [];
+        for (let y = 0; y < 9; y++) {
+            this.cells[y] = [];
+            for (let x = 0; x < 9; x++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => this.handleClick('board', x, y);
+                this.cells[y][x] = cell;
+                boardEl.appendChild(cell);
+            }
+        }
+    }
+
+    updateMessage(msg) {
+        const msgEl = document.getElementById('message');
+        if (msgEl && msgEl.innerText !== msg) {
+            msgEl.innerText = msg;
+        }
+    }
+
+    initBoard(level = this.currentLevel) {
+        this.currentLevel = level;
+        this.board = Array.from({length: 9}, () => Array(9).fill(null));
+        this.hands = { [PLAYER]: [], [OPPONENT]: [] };
+        this.turn = PLAYER;
+        this.selected = null;
+        this.legalMoves = [];
+        this.lastMove = null;
+        this.isGameOver = false;
+
+        const [castle, diff] = level.split('_');
+        
+        if (diff === 'easy') this.maxMoves = 10;
+        else if (diff === 'normal') this.maxMoves = 20;
+        else if (diff === 'hard') this.maxMoves = 25;
+        else this.maxMoves = 20;
+        
+        this.remainingMoves = this.maxMoves;
+
+        let initialLayout = Array.from({length: 9}, () => Array(9).fill(null));
+        let castleName = "";
+        
+        if (castle === 'anaguma') {
+            castleName = "穴熊";
+            if (diff === 'easy') {
+                initialLayout = [
+                    [null, null, null, null, null, null, null, {t:KNIGHT,o:1}, {t:LANCE,o:1}],
+                    [null, null, null, null, null, null, null, {t:SILVER,o:1}, {t:KING,o:1}],
+                    [null, null, null, null, null, null, {t:PAWN,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                    [{t:KING,o:0}, null, null, null, null, null, null, null, null]
+                ];
+                this.hands[PLAYER] = [GOLD, SILVER, KNIGHT];
+            } else if (diff === 'normal') {
+                initialLayout = [
+                    [null, null, null, null, null, null, {t:GOLD,o:1}, {t:KNIGHT,o:1}, {t:LANCE,o:1}],
+                    [null, null, null, null, null, null, {t:SILVER,o:1}, {t:SILVER,o:1}, {t:KING,o:1}],
+                    [null, null, null, null, null, {t:PAWN,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}],
+                    [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                    [{t:KING,o:0}, null, null, null, {t:BISHOP,o:0}, null, null, null, null]
+                ];
+                this.hands[PLAYER] = [GOLD, GOLD, SILVER, KNIGHT, PAWN, PAWN];
+            } else {
+                initialLayout = [
+                    [null, null, null, null, null, {t:GOLD,o:1}, {t:GOLD,o:1}, {t:KNIGHT,o:1}, {t:LANCE,o:1}],
+                    [null, null, null, null, null, null, {t:SILVER,o:1}, {t:SILVER,o:1}, {t:KING,o:1}],
+                    [null, null, null, null, {t:PAWN,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null, null],
+                    [null, null, null, null, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}],
+                    [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                    [{t:KING,o:0}, null, null, null, {t:BISHOP,o:0}, null, {t:SILVER,o:0}, {t:KNIGHT,o:0}, {t:LANCE,o:0}]
+                ];
+                this.hands[PLAYER] = [GOLD, GOLD, SILVER, KNIGHT, LANCE, PAWN, PAWN, PAWN];
+            }
+        } else if (castle === 'mino') {
+            castleName = "美濃囲い";
+            initialLayout = [
+                [null, null, null, null, null, {t:GOLD,o:1}, null, {t:KNIGHT,o:1}, {t:LANCE,o:1}],
+                [null, null, null, null, {t:GOLD,o:1}, null, {t:SILVER,o:1}, {t:KING,o:1}, null],
+                [null, null, null, null, null, {t:PAWN,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}],
+                [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                [{t:KING,o:0}, null, null, null, {t:BISHOP,o:0}, null, null, null, null]
+            ];
+            if (diff === 'easy') { initialLayout[0][5] = null; this.hands[PLAYER] = [GOLD, SILVER, KNIGHT, BISHOP, ROOK]; }
+            else if (diff === 'normal') { this.hands[PLAYER] = [GOLD, SILVER, KNIGHT, BISHOP]; }
+            else { this.hands[PLAYER] = [GOLD, SILVER, KNIGHT]; }
+        } else if (castle === 'highmino') {
+            castleName = "高美濃囲い";
+            initialLayout = [
+                [null, null, null, null, null, {t:GOLD,o:1}, null, {t:KNIGHT,o:1}, {t:LANCE,o:1}],
+                [null, null, null, null, {t:GOLD,o:1}, null, null, {t:KING,o:1}, null],
+                [null, null, null, null, null, {t:PAWN,o:1}, {t:SILVER,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}],
+                [null, null, null, null, null, null, {t:PAWN,o:1}, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}],
+                [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                [{t:KING,o:0}, null, null, null, {t:BISHOP,o:0}, null, null, null, null]
+            ];
+            if (diff === 'easy') { initialLayout[0][5] = null; this.hands[PLAYER] = [GOLD, SILVER, KNIGHT, KNIGHT, ROOK, BISHOP]; }
+            else if (diff === 'normal') { this.hands[PLAYER] = [GOLD, SILVER, KNIGHT, KNIGHT, ROOK]; }
+            else { this.hands[PLAYER] = [GOLD, SILVER, KNIGHT, ROOK]; }
+        } else if (castle === 'gin') {
+            castleName = "銀冠";
+            initialLayout = [
+                [null, null, null, null, null, null, null, {t:KNIGHT,o:1}, {t:LANCE,o:1}],
+                [null, null, null, null, {t:GOLD,o:1}, {t:GOLD,o:1}, null, {t:KING,o:1}, null],
+                [null, null, null, null, null, null, {t:PAWN,o:1}, {t:SILVER,o:1}, {t:PAWN,o:1}],
+                [null, null, null, null, null, {t:PAWN,o:1}, null, {t:PAWN,o:1}, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}],
+                [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                [{t:KING,o:0}, null, null, null, {t:BISHOP,o:0}, null, null, null, null]
+            ];
+            if (diff === 'easy') { initialLayout[1][5] = null; this.hands[PLAYER] = [GOLD, GOLD, SILVER, LANCE, BISHOP, ROOK]; }
+            else if (diff === 'normal') { this.hands[PLAYER] = [GOLD, GOLD, SILVER, LANCE, BISHOP]; }
+            else { this.hands[PLAYER] = [GOLD, SILVER, LANCE, BISHOP]; }
+        } else if (castle === 'yagura') {
+            castleName = "矢倉囲い";
+            initialLayout = [
+                [{t:LANCE,o:1}, {t:KNIGHT,o:1}, null, {t:GOLD,o:1}, null, null, null, null, null],
+                [null, {t:KING,o:1}, {t:GOLD,o:1}, null, null, null, null, null, null],
+                [{t:PAWN,o:1}, {t:PAWN,o:1}, {t:SILVER,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}, null, null, null, null],
+                [null, null, {t:PAWN,o:1}, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [{t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, null, null, null, null],
+                [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                [null, null, null, null, {t:BISHOP,o:0}, null, null, null, {t:KING,o:0}]
+            ];
+            if (diff === 'easy') { initialLayout[0][3] = null; this.hands[PLAYER] = [GOLD, GOLD, SILVER, KNIGHT, KNIGHT, ROOK, BISHOP]; }
+            else if (diff === 'normal') { this.hands[PLAYER] = [GOLD, GOLD, SILVER, KNIGHT, KNIGHT, ROOK]; }
+            else { this.hands[PLAYER] = [GOLD, SILVER, KNIGHT, KNIGHT, ROOK]; }
+        } else if (castle === 'gangi') {
+            castleName = "雁木囲い";
+            initialLayout = [
+                [{t:LANCE,o:1}, {t:KNIGHT,o:1}, null, {t:GOLD,o:1}, null, null, null, null, null],
+                [null, {t:KING,o:1}, {t:GOLD,o:1}, {t:SILVER,o:1}, null, null, null, null, null],
+                [{t:PAWN,o:1}, {t:PAWN,o:1}, {t:SILVER,o:1}, {t:PAWN,o:1}, {t:PAWN,o:1}, null, null, null, null],
+                [null, null, {t:PAWN,o:1}, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [{t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, null, null, null, null],
+                [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                [null, null, null, null, {t:BISHOP,o:0}, null, null, null, {t:KING,o:0}]
+            ];
+            if (diff === 'easy') { initialLayout[0][3] = null; this.hands[PLAYER] = [GOLD, GOLD, SILVER, SILVER, KNIGHT, BISHOP]; }
+            else if (diff === 'normal') { this.hands[PLAYER] = [GOLD, GOLD, SILVER, SILVER, KNIGHT]; }
+            else { this.hands[PLAYER] = [GOLD, SILVER, SILVER, KNIGHT]; }
+        } else if (castle === 'kani') {
+            castleName = "カニ囲い";
+            initialLayout = [
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, {t:GOLD,o:1}, {t:KING,o:1}, {t:GOLD,o:1}, null, null, null],
+                [null, null, null, {t:SILVER,o:1}, {t:PAWN,o:1}, {t:SILVER,o:1}, null, null, null],
+                [null, null, null, {t:PAWN,o:1}, null, {t:PAWN,o:1}, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null, null],
+                [null, null, null, {t:PAWN,o:0}, {t:PAWN,o:0}, {t:PAWN,o:0}, null, null, null],
+                [null, null, null, null, null, null, null, {t:ROOK,o:0}, null],
+                [{t:KING,o:0}, null, null, null, {t:BISHOP,o:0}, null, null, null, null]
+            ];
+            if (diff === 'easy') { initialLayout[1][5] = null; this.hands[PLAYER] = [GOLD, SILVER, KNIGHT, BISHOP, ROOK]; }
+            else if (diff === 'normal') { this.hands[PLAYER] = [GOLD, SILVER, KNIGHT, BISHOP]; }
+            else { this.hands[PLAYER] = [SILVER, KNIGHT, BISHOP]; }
+        }
+
+        const diffStr = diff === 'easy' ? "初級" : (diff === 'normal' ? "中級" : "上級");
+        this.updateMessage(`【${castleName}・${diffStr}】先手(あなた)の番です`);
+        document.getElementById('opponent-label').innerText = `${castleName} (${diffStr})`;
+
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                if (initialLayout[y][x]) {
+                    this.board[y][x] = {
+                        type: initialLayout[y][x].t,
+                        owner: initialLayout[y][x].o,
+                        promoted: false
+                    };
+                }
+            }
+        }
+        
+        this.initKingPositions();
+        this.updateMoveLimitUI();
+        this.render();
+    }
+
+    updateMoveLimitUI() {
+        const display = document.getElementById('move-limit-display');
+        const text = document.getElementById('remaining-moves-text');
+        if (display && text) {
+            display.classList.remove('hidden');
+            text.innerText = this.remainingMoves;
+        }
+    }
+
+    getPiece(x, y) {
+        if (x < 0 || x > 8 || y < 0 || y > 8) return null;
+        return this.board[y][x];
+    }
+
+    getPieceMovement(piece) {
+        const type = piece.type;
+        const p = piece.promoted;
+        const o = piece.owner;
+
+        if (type === KING) return MOVE_DIRS.KING;
+        if (type === GOLD || (p && (type === PAWN || type === LANCE || type === KNIGHT || type === SILVER))) return MOVE_DIRS.GOLD[o];
+        if (type === PAWN) return MOVE_DIRS.PAWN[o];
+        if (type === KNIGHT) return MOVE_DIRS.KNIGHT[o];
+        if (type === SILVER) return MOVE_DIRS.SILVER[o];
+        if (type === LANCE) return MOVE_DIRS.LANCE[o];
+        if (type === BISHOP) return p ? MOVE_DIRS.PRO_BISHOP : MOVE_DIRS.BISHOP;
+        if (type === ROOK) return p ? MOVE_DIRS.PRO_ROOK : MOVE_DIRS.ROOK;
+        return [];
+    }
+
+    canAttackTarget(fromX, fromY, piece, targetX, targetY) {
+        const movements = this.getPieceMovement(piece);
+        for (let i = 0; i < movements.length; i++) {
+            const move = movements[i];
+            if (move.slide) {
+                if (move.dx !== 0 && (targetX - fromX) * move.dx <= 0) continue;
+                if (move.dy !== 0 && (targetY - fromY) * move.dy <= 0) continue;
+                if (move.dx === 0 && targetX !== fromX) continue;
+                if (move.dy === 0 && targetY !== fromY) continue;
+                if (move.dx !== 0 && move.dy !== 0 && Math.abs(targetX - fromX) !== Math.abs(targetY - fromY)) continue;
+
+                let cx = fromX + move.dx;
+                let cy = fromY + move.dy;
+                while (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    if (cx === targetX && cy === targetY) return true;
+                    const p = this.board[cy][cx];
+                    if (p !== null) break; 
+                    cx += move.dx;
+                    cy += move.dy;
+                }
+            } else {
+                if (fromX + move.dx === targetX && fromY + move.dy === targetY) return true;
+            }
+        }
+        return false;
+    }
+
+    getRawMoves(x, y) {
+        const piece = this.board[y][x];
+        if (!piece) return [];
+
+        const movements = this.getPieceMovement(piece);
+        let moves = [];
+        for (let i = 0; i < movements.length; i++) {
+            const move = movements[i];
+            if (move.slide) {
+                let cx = x + move.dx;
+                let cy = y + move.dy;
+                while (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    const p = this.board[cy][cx];
+                    if (p === null || p.owner !== piece.owner) {
+                        moves.push({toX: cx, toY: cy});
+                    }
+                    if (p !== null) break;
+                    
+                    cx += move.dx;
+                    cy += move.dy;
+                }
+            } else {
+                let cx = x + move.dx;
+                let cy = y + move.dy;
+                if (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    const p = this.board[cy][cx];
+                    if (p === null || p.owner !== piece.owner) {
+                        moves.push({toX: cx, toY: cy});
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    isInCheck(player) {
+        const kPos = this.kingPos[player];
+        if (!kPos) return true; // 玉がいない場合はチェック扱い
+        const {x: kingX, y: kingY} = kPos;
+
+        const opponent = player === PLAYER ? OPPONENT : PLAYER;
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.owner === opponent) {
+                    if (this.canAttackTarget(x, y, p, kingX, kingY)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    testMoveUnchecks(from, to, player) {
+        const toPiece = this.board[to.y][to.x];
+        let fromPiece = null;
+        let originalKingPos = this.kingPos[player];
+        let movedKing = false;
+        
+        if (from.x !== undefined) {
+            fromPiece = this.board[from.y][from.x];
+            this.board[to.y][to.x] = fromPiece;
+            this.board[from.y][from.x] = null;
+            if (fromPiece.type === KING) {
+                this.kingPos[player] = {x: to.x, y: to.y};
+                movedKing = true;
+            }
+        } else {
+            fromPiece = { type: from.type, owner: player, promoted: false };
+            this.board[to.y][to.x] = fromPiece;
+        }
+
+        const isSafe = !this.isInCheck(player);
+
+        if (from.x !== undefined) {
+            this.board[from.y][from.x] = fromPiece;
+            this.board[to.y][to.x] = toPiece;
+            if (movedKing) {
+                this.kingPos[player] = originalKingPos;
+            }
+        } else {
+            this.board[to.y][to.x] = null;
+        }
+
+        return isSafe;
+    }
+
+    isNifu(x, player) {
+        for (let y = 0; y < 9; y++) {
+            const p = this.board[y][x];
+            if (p && p.type === PAWN && p.owner === player && !p.promoted) return true;
+        }
+        return false;
+    }
+
+    hasNoPlaceToGo(type, y, player) {
+        if (player === PLAYER) {
+            if (type === PAWN || type === LANCE) return y === 0;
+            if (type === KNIGHT) return y <= 1;
+        } else {
+            if (type === PAWN || type === LANCE) return y === 8;
+            if (type === KNIGHT) return y >= 7;
+        }
+        return false;
+    }
+
+    hasAnyLegalMove(player, checkUchifu = false) {
+        const inCheck = this.isInCheck(player);
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.owner === player) {
+                    const rawMoves = this.getRawMoves(x, y);
+                    for (let i = 0; i < rawMoves.length; i++) {
+                        const m = rawMoves[i];
+                        if (this.testMoveUnchecks({x, y}, {x: m.toX, y: m.toY}, player)) return true;
+                    }
+                }
+            }
+        }
+        const uniqueHands = [...new Set(this.hands[player])];
+        for (let i = 0; i < uniqueHands.length; i++) {
+            const type = uniqueHands[i];
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    if (this.board[y][x] === null) {
+                        if (type === PAWN && this.isNifu(x, player)) continue;
+                        if (this.hasNoPlaceToGo(type, y, player)) continue;
+                        let isSafe = true;
+                        if (inCheck) isSafe = this.testMoveUnchecks({type: type}, {x, y}, player);
+                        if (isSafe) {
+                            if (type === PAWN && checkUchifu && this.isUchifuZume(x, y, player)) continue;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    getAllLegalMoves(player, checkUchifu = true) {
+        let allMoves = [];
+        const inCheck = this.isInCheck(player);
+        
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.owner === player) {
+                    const rawMoves = this.getRawMoves(x, y);
+                    for (const m of rawMoves) {
+                        if (this.testMoveUnchecks({x, y}, {x: m.toX, y: m.toY}, player)) {
+                            allMoves.push({from: {x,y}, to: {x: m.toX, y: m.toY}});
+                        }
+                    }
+                }
+            }
+        }
+
+        const uniqueHands = [...new Set(this.hands[player])];
+        for (const type of uniqueHands) {
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    if (this.board[y][x] === null) {
+                        if (type === PAWN && this.isNifu(x, player)) continue;
+                        if (this.hasNoPlaceToGo(type, y, player)) continue;
+                        
+                        let isSafe = true;
+                        if (inCheck) {
+                            isSafe = this.testMoveUnchecks({type: type}, {x, y}, player);
+                        }
+                        
+                        if (isSafe) {
+                            if (type === PAWN && checkUchifu && this.isUchifuZume(x, y, player)) continue;
+                            allMoves.push({from: {type: type}, to: {x, y}});
+                        }
+                    }
+                }
+            }
+        }
+        return allMoves;
+    }
+
+    isUchifuZume(x, y, player) {
+        this.board[y][x] = { type: PAWN, owner: player, promoted: false };
+        const opponent = player === PLAYER ? OPPONENT : PLAYER;
+        let isMate = false;
+        
+        if (this.isInCheck(opponent)) {
+            if (!this.hasAnyLegalMove(opponent, false)) {
+                isMate = true;
+            }
+        }
+        
+        this.board[y][x] = null;
+        return isMate;
+    }
+
+    calcLegalMovesForSelected() {
+        this.legalMoves = [];
+        if (!this.selected) {
+            this.render();
+            return;
+        }
+        
+        const player = this.turn;
+        const inCheck = this.isInCheck(player);
+        
+        if (this.selected.type === 'board') {
+            const sx = this.selected.x, sy = this.selected.y;
+            const rawMoves = this.getRawMoves(sx, sy);
+            for (let i = 0; i < rawMoves.length; i++) {
+                const m = rawMoves[i];
+                if (this.testMoveUnchecks({x: sx, y: sy}, {x: m.toX, y: m.toY}, player)) {
+                    this.legalMoves.push({toX: m.toX, toY: m.toY});
+                }
+            }
+        } else if (this.selected.type === 'hand') {
+            const type = this.selected.pieceType;
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    if (this.board[y][x] === null) {
+                        if (type === PAWN && this.isNifu(x, player)) continue;
+                        if (this.hasNoPlaceToGo(type, y, player)) continue;
+                        
+                        let isSafe = true;
+                        if (inCheck) {
+                            isSafe = this.testMoveUnchecks({type: type}, {x, y}, player);
+                        }
+                        
+                        if (isSafe) {
+                            if (type === PAWN && this.isUchifuZume(x, y, player)) continue;
+                            this.legalMoves.push({toX: x, toY: y});
+                        }
+                    }
+                }
+            }
+        }
+        this.render();
+    }
+
+
+    handleClick(type, x, y) {
+        if (this.isGameOver) return;
+        if (this.turn === OPPONENT) return; // CPUのターンは操作不可
+
+        if (type === 'board') {
+            const clickedPiece = this.board[y][x];
+
+            if (!this.selected) {
+                if (clickedPiece && clickedPiece.owner === this.turn) {
+                    this.selected = { type: 'board', x, y };
+                    this.calcLegalMovesForSelected();
+                }
+            } 
+            else {
+                const isLegalMove = this.legalMoves.find(m => m.toX === x && m.toY === y);
+                if (isLegalMove) {
+                    this.executeMove(this.selected, {x, y});
+                } 
+                else if (clickedPiece && clickedPiece.owner === this.turn) {
+                    this.selected = { type: 'board', x, y };
+                    this.calcLegalMovesForSelected();
+                } 
+                else {
+                    this.selected = null;
+                    this.legalMoves = [];
+                    this.render();
+                }
+            }
+        }
+    }
+    
+    handleHandClick(player, type) {
+        if (this.isGameOver) return;
+        if (this.turn === OPPONENT) return;
+
+        if (this.turn === player) {
+            this.selected = { type: 'hand', pieceType: type };
+            this.calcLegalMovesForSelected();
+        }
+    }
+
+    isEnemyTerritory(y, player) { return player === PLAYER ? y <= 2 : y >= 6; }
+
+    canPromote(move, player) {
+        if (move.from.type) return false;
+        const piece = this.board[move.from.y][move.from.x];
+        if (!piece || piece.promoted || piece.type === KING || piece.type === GOLD) return false;
+        return this.isEnemyTerritory(move.to.y, player) || this.isEnemyTerritory(move.from.y, player);
+    }
+
+    executeMove(from, to, autoPromote = null) {
+        let movedPiece;
+        let isPromoteAttempt = false;
+        let forcePromote = false;
+
+        if (from.type === 'board' || from.x !== undefined) {
+            movedPiece = this.board[from.y][from.x];
+            const targetPiece = this.board[to.y][to.x];
+
+            if (targetPiece) {
+                this.hands[this.turn].push(targetPiece.type);
+            }
+            this.board[from.y][from.x] = null;
+            this.board[to.y][to.x] = movedPiece;
+
+            if (movedPiece.type === KING) {
+                this.kingPos[movedPiece.owner] = {x: to.x, y: to.y};
+            }
+
+            if (!movedPiece.promoted && movedPiece.type !== KING && movedPiece.type !== GOLD) {
+                if (this.isEnemyTerritory(to.y, this.turn) || this.isEnemyTerritory(from.y, this.turn)) {
+                    if (this.hasNoPlaceToGo(movedPiece.type, to.y, this.turn)) forcePromote = true;
+                    else isPromoteAttempt = true;
+                }
+            }
+        } else if (from.type === 'hand' || from.type !== undefined) {
+            const type = from.pieceType || from.type;
+            const index = this.hands[this.turn].indexOf(type);
+            if (index > -1) this.hands[this.turn].splice(index, 1);
+            movedPiece = { type: type, owner: this.turn, promoted: false };
+            this.board[to.y][to.x] = movedPiece;
+        }
+
+        this.lastMove = { from, to };
+        this.selected = null;
+        this.legalMoves = [];
+
+        if (forcePromote || autoPromote === true) {
+            movedPiece.promoted = true;
+            this.endTurn();
+        } else if (autoPromote === false) {
+            this.endTurn();
+        } else if (isPromoteAttempt) {
+            this.showPromoteModal(movedPiece, to, from);
+        } else {
+            this.endTurn();
+        }
+    }
+
+    showPromoteModal(piece, to, from) {
+        window.showModal("成りますか？", "", [
+            { text: "成る", onClick: () => { 
+                piece.promoted = true; 
+                window.hideModal(); 
+                this.endTurn(); 
+            } },
+            { text: "成らない", onClick: () => { 
+                window.hideModal(); 
+                this.endTurn(); 
+            } }
+        ]);
+    }
+
+    endTurn() {
+        this.remainingMoves--;
+        this.turn = this.turn === PLAYER ? OPPONENT : PLAYER;
+        this.postTurnProcessing();
+    }
+
+    postTurnProcessing() {
+        let isMate = false;
+        
+        // 相手玉を取った場合の即時終了判定（パズル用のおまけ）
+        if (!this.kingPos[PLAYER]) {
+            this.updateMessage("敗北... 王が取られました。");
+            this.isGameOver = true;
+            window.showModal("敗北", "玉を討ち取られました。再挑戦してください。", [{text: "閉じる", onClick: window.hideModal}]);
+            this.updateMoveLimitUI();
+            this.render();
+            return;
+        }
+        if (!this.kingPos[OPPONENT]) {
+            this.updateMessage("クリア！穴熊を見事突破しました！");
+            this.isGameOver = true;
+            window.showModal("見事！", "最強の守り「穴熊」を打ち破りました！<br>残した手数: " + this.remainingMoves + "手", [{text: "閉じる", onClick: window.hideModal}]);
+            this.updateMoveLimitUI();
+            this.render();
+            return;
+        }
+
+        if (!this.hasAnyLegalMove(this.turn, true)) {
+            const winner = this.turn === PLAYER ? "後手(CPU)" : "あなた";
+            let msg = this.turn === PLAYER ? "敗北... 手がありません。" : "見事！穴熊を詰ませました！";
+            this.updateMessage(msg);
+            this.isGameOver = true;
+            isMate = true;
+            let modalMsg = this.turn === PLAYER ? msg : msg + "<br>残した手数: " + this.remainingMoves + "手";
+            window.showModal("決着", modalMsg, [{text: "閉じる", onClick: window.hideModal}]);
+        }
+
+        if (!isMate && this.remainingMoves <= 0) {
+            this.updateMessage("手数切れ... 突破失敗。");
+            this.isGameOver = true;
+            window.showModal("手数切れ", "規定の手数に到達しました。<br>穴熊突破失敗です...", [{text: "閉じる", onClick: window.hideModal}]);
+            this.updateMoveLimitUI();
+            this.render();
+            return;
+        }
+
+        if (!isMate) {
+            if (this.isInCheck(this.turn)) {
+                this.updateMessage("王手！");
+            } else {
+                this.updateMessage(this.turn === PLAYER ? `先手(あなた)の番です` : "CPU思考中...");
+            }
+        }
+
+        this.updateMoveLimitUI();
+        this.render();
+
+        // CPUのターン
+        if (this.turn === OPPONENT && !this.isGameOver) {
+            setTimeout(() => this.cpuThink(), 50);
+        }
+    }
+
+    initKingPositions() {
+        this.kingPos = { [PLAYER]: null, [OPPONENT]: null };
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.type === KING) this.kingPos[p.owner] = {x, y};
+            }
+        }
+    }
+
+    async cpuThink() {
+        this.updateMessage("CPUが思考中...");
+        await new Promise(r => setTimeout(r, 50));
+
+        const moves = this.getAllLegalMoves(OPPONENT);
+        if (moves.length === 0) return;
+
+        // 穴熊防御CPU: アルファベータ法 (レベルに応じて深さを変更して手強さを調整)
+        const depth = this.currentLevel === 'anaguma_hard' ? 3 : 2; 
+        const res = await this.getBestMoveAlphaBetaAsync(depth, OPPONENT, moves);
+        
+        let bestMove = res.move;
+        let promote = res.promote;
+
+        if (bestMove) {
+            this.executeMove(bestMove.from, {x: bestMove.to.x, y: bestMove.to.y}, promote);
+        }
+    }
+
+    evaluateBoard() {
+        let score = 0;
+        const pVals = { [PAWN]: 100, [LANCE]: 300, [KNIGHT]: 400, [SILVER]: 500, [GOLD]: 600, [BISHOP]: 800, [ROOK]: 1000, [KING]: 10000 };
+        const pPromVals = { [PAWN]: 600, [LANCE]: 600, [KNIGHT]: 600, [SILVER]: 600, [BISHOP]: 1200, [ROOK]: 1500 };
+
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p) {
+                    let val = p.promoted ? pPromVals[p.type] : pVals[p.type];
+                    if (p.type !== KING) {
+                        // 穴熊CPUは自陣(1,2,3筋)の守りを高く評価するような位置取りの調整も可能ですが
+                        // ここでは標準的な評価関数を使用
+                        if (p.owner === OPPONENT) val += y * 2;
+                        else val += (8 - y) * 2;
+                    }
+                    if (p.owner === OPPONENT) score += val;
+                    else score -= val;
+                }
+            }
+        }
+
+        for (let type of this.hands[OPPONENT]) score += pVals[type] * 1.1;
+        for (let type of this.hands[PLAYER]) score -= pVals[type] * 1.1;
+
+        return score;
+    }
+
+    doMoveTemp(move, player, promote) {
+        const history = {
+            hands: { [PLAYER]: [...this.hands[PLAYER]], [OPPONENT]: [...this.hands[OPPONENT]] }
+        };
+        
+        if (move.from.type) {
+            history.fromType = move.from.type;
+            history.toPiece = this.board[move.to.y][move.to.x];
+            
+            const idx = this.hands[player].indexOf(move.from.type);
+            if(idx > -1) this.hands[player].splice(idx, 1);
+            this.board[move.to.y][move.to.x] = { type: move.from.type, owner: player, promoted: false };
+        } else {
+            history.fromPiece = this.board[move.from.y][move.from.x];
+            history.toPiece = this.board[move.to.y][move.to.x];
+            
+            let p = { ...history.fromPiece };
+            if (promote) p.promoted = true;
+            
+            if (history.toPiece) {
+                this.hands[player].push(history.toPiece.type);
+            }
+            this.board[move.from.y][move.from.x] = null;
+            this.board[move.to.y][move.to.x] = p;
+        }
+        
+        // 王の位置一時更新
+        let updatedKing = false;
+        history.kingPos = { ...this.kingPos[player] };
+        if (!move.from.type && history.fromPiece.type === KING) {
+            this.kingPos[player] = { x: move.to.x, y: move.to.y };
+            updatedKing = true;
+        }
+
+        return history;
+    }
+
+    undoMoveTemp(move, player, history) {
+        this.hands[PLAYER] = history.hands[PLAYER];
+        this.hands[OPPONENT] = history.hands[OPPONENT];
+        
+        if (move.from.type) {
+            this.board[move.to.y][move.to.x] = history.toPiece;
+        } else {
+            this.board[move.from.y][move.from.x] = history.fromPiece;
+            this.board[move.to.y][move.to.x] = history.toPiece;
+        }
+        
+        this.kingPos[player] = history.kingPos;
+    }
+
+    async getBestMoveAlphaBetaAsync(depth, player, initialMoves) {
+        let bestScore = -Infinity;
+        let bestMove = null;
+        let bestPromote = false;
+        let alpha = -Infinity;
+        let beta = Infinity;
+
+        const moves = [...initialMoves].sort(() => Math.random() - 0.5);
+
+        for (let m of moves) {
+            const canPro = this.canPromote(m, player);
+            const promotes = canPro ? [true, false] : [false];
+            
+            for (let pro of promotes) {
+                const history = this.doMoveTemp(m, player, pro);
+                const score = this.alphaBetaSearch(depth - 1, alpha, beta, PLAYER);
+                this.undoMoveTemp(m, player, history);
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = m;
+                    bestPromote = pro;
+                }
+                alpha = Math.max(alpha, bestScore);
+            }
+            await new Promise(r => setTimeout(r, 0)); // ブラウザが固まらないように
+        }
+
+        return { move: bestMove || moves[0], promote: bestPromote };
+    }
+
+    alphaBetaSearch(depth, alpha, beta, player) {
+        if (depth === 0) return this.evaluateBoard();
+
+        const moves = this.getAllLegalMoves(player);
+        if (moves.length === 0) {
+            return player === OPPONENT ? -99999 - depth : 99999 + depth;
+        }
+
+        if (player === OPPONENT) {
+            let maxScore = -Infinity;
+            for (let m of moves) {
+                const canPro = this.canPromote(m, player);
+                const promotes = canPro ? [true] : [false];
+                for (let pro of promotes) {
+                    const history = this.doMoveTemp(m, player, pro);
+                    const score = this.alphaBetaSearch(depth - 1, alpha, beta, PLAYER);
+                    this.undoMoveTemp(m, player, history);
+                    maxScore = Math.max(maxScore, score);
+                    alpha = Math.max(alpha, score);
+                    if (beta <= alpha) break;
+                }
+                if (beta <= alpha) break;
+            }
+            return maxScore;
+        } else {
+            let minScore = Infinity;
+            for (let m of moves) {
+                const canPro = this.canPromote(m, player);
+                const promotes = canPro ? [true] : [false];
+                for (let pro of promotes) {
+                    const history = this.doMoveTemp(m, player, pro);
+                    const score = this.alphaBetaSearch(depth - 1, alpha, beta, OPPONENT);
+                    this.undoMoveTemp(m, player, history);
+                    minScore = Math.min(minScore, score);
+                    beta = Math.min(beta, score);
+                    if (beta <= alpha) break;
+                }
+                if (beta <= alpha) break;
+            }
+            return minScore;
+        }
+    }
+
+    render() {
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const cell = this.cells[y][x];
+                const piece = this.board[y][x];
+                
+                let cClasses = 'cell';
+                if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) cClasses += ' selected';
+                if (this.lastMove && ((this.lastMove.from.type === 'board' && this.lastMove.from.x === x && this.lastMove.from.y === y) || (this.lastMove.to.x === x && this.lastMove.to.y === y))) cClasses += ' last-move';
+                if (this.legalMoves.some(m => m.toX === x && m.toY === y)) cClasses += ' highlight';
+                
+                if (cell.className !== cClasses) cell.className = cClasses;
+
+                let pieceEl = cell.firstChild;
+
+                if (piece) {
+                    if (!pieceEl) {
+                        pieceEl = document.createElement('div');
+                        cell.appendChild(pieceEl);
+                    }
+                    
+                    let pClasses = 'piece';
+                    if (piece.owner === OPPONENT) pClasses += ' opponent-piece';
+                    if (piece.promoted) pClasses += ' promoted';
+
+                    if (pieceEl.className !== pClasses) pieceEl.className = pClasses;
+                    
+                    let pStr = pieceStrs[piece.type][piece.promoted ? 1 : 0];
+                    if (piece.type === KING && piece.owner === OPPONENT) pStr = '王';
+                    
+                    if (pieceEl.innerText !== pStr) pieceEl.innerText = pStr;
+                } else {
+                    if (pieceEl) cell.removeChild(pieceEl);
+                }
+            }
+        }
+
+        this.renderHand(PLAYER, 'player-hand');
+        this.renderHand(OPPONENT, 'opponent-hand');
+    }
+
+    renderHand(player, containerId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        const counts = {};
+        const displayOrder = [ROOK, BISHOP, GOLD, SILVER, KNIGHT, LANCE, PAWN];
+        this.hands[player].forEach(p => { counts[p] = (counts[p] || 0) + 1; });
+
+        displayOrder.forEach(type => {
+            if (counts[type]) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'hand-piece';
+                if (this.selected && this.selected.type === 'hand' && this.selected.pieceType === type && this.turn === player) {
+                    wrapper.classList.add('selected');
+                }
+                if (player === OPPONENT) wrapper.classList.add('opponent-piece');
+                
+                wrapper.innerText = pieceStrs[type][0];
+                if (counts[type] > 1) {
+                    const cnt = document.createElement('span');
+                    cnt.className = 'hand-count';
+                    cnt.innerText = counts[type];
+                    wrapper.appendChild(cnt);
+                }
+                wrapper.onclick = () => { this.handleHandClick(player, type); };
+                container.appendChild(wrapper);
+            }
+        });
+    }
+}
+
+// モーダル管理
+const modalOverlay = document.getElementById('modal-overlay');
+const modalTitle = document.getElementById('modal-title');
+const modalMessage = document.getElementById('modal-message');
+const modalButtons = document.getElementById('modal-buttons');
+
+window.showModal = function(title, message, buttons) {
+    modalTitle.innerHTML = title;
+    modalMessage.innerHTML = message;
+    modalButtons.innerHTML = '';
+    
+    buttons.forEach(b => {
+        const btn = document.createElement('button');
+        btn.innerText = b.text;
+        
+        if (b.text === "キャンセル") {
+            btn.className = "px-4 py-2 mt-2 w-full bg-gray-500 text-white rounded hover:bg-gray-600 transition font-bold shadow";
+        } else {
+            btn.className = "px-2 py-2 text-sm bg-[#5d4037] text-white rounded hover:bg-[#4a3623] transition font-bold whitespace-nowrap shadow";
+            btn.style.flex = "1 1 calc(33% - 8px)";
+        }
+        
+        btn.onclick = b.onClick;
+        modalButtons.appendChild(btn);
+    });
+    modalOverlay.style.display = 'flex';
+}
+
+window.hideModal = function() { modalOverlay.style.display = 'none'; }
+
+// 初期化
+window.onload = () => {
+    window.game = new Game();
+    
+    function selectDifficulty(castle) {
+        window.showModal("難易度選択", "難易度（制限手数）を選択してください。", [
+            { text: "初級 (10手)", onClick: () => { window.game.initBoard(`${castle}_easy`); window.hideModal(); } },
+            { text: "中級 (20手)", onClick: () => { window.game.initBoard(`${castle}_normal`); window.hideModal(); } },
+            { text: "上級 (25手)", onClick: () => { window.game.initBoard(`${castle}_hard`); window.hideModal(); } },
+            { text: "戻る", onClick: openCastleSelection }
+        ]);
+    }
+
+    function openCastleSelection() {
+        window.showModal("囲い選択", "どの囲いに挑戦しますか？", [
+            { text: "穴熊", onClick: () => selectDifficulty('anaguma') },
+            { text: "美濃囲い", onClick: () => selectDifficulty('mino') },
+            { text: "高美濃囲い", onClick: () => selectDifficulty('highmino') },
+            { text: "銀冠", onClick: () => selectDifficulty('gin') },
+            { text: "矢倉", onClick: () => selectDifficulty('yagura') },
+            { text: "雁木", onClick: () => selectDifficulty('gangi') },
+            { text: "カニ囲い", onClick: () => selectDifficulty('kani') },
+            { text: "キャンセル", onClick: window.hideModal }
+        ]);
+    }
+
+    document.getElementById('reset-btn').addEventListener('click', openCastleSelection);
+};
+</script>
+</body>
+</html>
